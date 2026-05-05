@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Vecteurs : Direction et Sens - Précision Absolue</title>
+    <style>
+        body { font-family: 'Courier New', monospace; background: #f0f2f5; display: flex; flex-direction: column; align-items: center; padding: 20px; }
+        .container { background: white; padding: 30px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); width: 850px; text-align: center; }
+        .dashboard { background: #2c3e50; color: white; padding: 20px; border-radius: 10px; margin-bottom: 15px; display: flex; justify-content: space-around; font-size: 1.2em; }
+        canvas { background: #fff; border: 2px solid #ddd; border-radius: 8px; cursor: crosshair; }
+        .indicator { padding: 5px 15px; border-radius: 20px; font-weight: bold; }
+        .on { background: #2ecc71; color: white; }
+        .off { background: #e74c3c; color: white; }
+        .neutral { background: #95a5a6; color: white; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="dashboard">
+        <div>Direction : <span id="dir-ui" class="indicator neutral">---</span></div>
+        <div>Sens : <span id="sens-ui" class="indicator neutral">---</span></div>
+    </div>
+
+    <canvas id="vectorCanvas" width="800" height="400"></canvas>
+    
+    <p style="color: #666; margin-top: 15px;">
+</p>
+</div>
+
+<script>
+    const canvas = document.getElementById('vectorCanvas');
+    const ctx = canvas.getContext('2d');
+
+    // Vecteur u (Fixe)
+    const A = { x: 50, y: 50 }, B = { x: 250, y: 150 };
+    // Vecteur v (Mobile)
+    let Ap = { x: 300, y: 250 }, Bp = { x: 500, y: 350 };
+    
+    let dragging = null;
+
+    function drawVecteur(p1, p2, color, label, isFixed) {
+        const dx = p2.x - p1.x;
+        const dy = p2.y - p1.y;
+        const angle = Math.atan2(dy, dx);
+        const headlen = 15;
+
+        // Direction (Droite Support Infinie)
+        ctx.beginPath();
+        ctx.setLineDash([8, 8]);
+        ctx.strokeStyle = color + "44"; // Transparence
+        ctx.moveTo(p1.x - Math.cos(angle)*2000, p1.y - Math.sin(angle)*2000);
+        ctx.lineTo(p1.x + Math.cos(angle)*2000, p1.y + Math.sin(angle)*2000);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Vecteur Principal
+        ctx.beginPath();
+        ctx.moveTo(p1.x, p1.y);
+        ctx.lineTo(p2.x, p2.y);
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 4;
+        ctx.stroke();
+
+        // Pointe de la flèche (Sens)
+        ctx.beginPath();
+        ctx.moveTo(p2.x, p2.y);
+        ctx.lineTo(p2.x - headlen * Math.cos(angle - Math.PI / 6), p2.y - headlen * Math.sin(angle - Math.PI / 6));
+        ctx.lineTo(p2.x - headlen * Math.cos(angle + Math.PI / 6), p2.y - headlen * Math.sin(angle + Math.PI / 6));
+        ctx.closePath();
+        ctx.fillStyle = color;
+        ctx.fill();
+
+        // Points
+        ctx.fillStyle = "#2c3e50";
+        ctx.beginPath(); ctx.arc(p1.x, p1.y, 6, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(p2.x, p2.y, 6, 0, Math.PI*2); ctx.fill();
+        ctx.fillText(label, p1.x - 10, p1.y - 15);
+    }
+
+    function checkVecteurs() {
+        const dirUI = document.getElementById('dir-ui');
+        const sensUI = document.getElementById('sens-ui');
+
+        // Composantes de u (dx, dy)
+        const ux = B.x - A.x, uy = B.y - A.y;
+        const vx = Bp.x - Ap.x, vy = Bp.y - Ap.y;
+
+        // Calcul des angles (entre -PI et PI)
+        let angleU = Math.atan2(uy, ux);
+        let angleV = Math.atan2(vy, vx);
+
+        // Différence d'angle pour la Direction (Parallélisme)
+        // La direction est la même si diff angle est 0 ou PI (180°)
+        let diffAngle = Math.abs(angleU - angleV);
+        let isParallel = (diffAngle < 0.05) || (Math.abs(diffAngle - Math.PI) < 0.05);
+
+        if (isParallel) {
+            dirUI.innerText = "Même Direction";
+            dirUI.className = "indicator on";
+            
+            // Sens (Même sens si angleU == angleV)
+            if (Math.abs(angleU - angleV) < 0.05) {
+                sensUI.innerText = "Même Sens";
+                sensUI.className = "indicator on";
+            } else {
+                sensUI.innerText = "Sens Opposé";
+                sensUI.className = "indicator off";
+            }
+        } else {
+            dirUI.innerText = "Direction Différente";
+            dirUI.className = "indicator off";
+            sensUI.innerText = "---";
+            sensUI.className = "indicator neutral";
+        }
+    }
+
+    function render() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        drawVecteur(A, B, "#3498db", "u (Référence)", true);
+        drawVecteur(Ap, Bp, "#e67e22", "v (Test)", false);
+        checkVecteurs();
+    }
+
+    canvas.onmousedown = (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+        if (Math.hypot(mx - Ap.x, my - Ap.y) < 20) dragging = 'A';
+        else if (Math.hypot(mx - Bp.x, my - Bp.y) < 20) dragging = 'B';
+    };
+
+    window.onmousemove = (e) => {
+        if (dragging) {
+            const rect = canvas.getBoundingClientRect();
+            if (dragging === 'A') { Ap.x = e.clientX - rect.left; Ap.y = e.clientY - rect.top; }
+            else { Bp.x = e.clientX - rect.left; Bp.y = e.clientY - rect.top; }
+            render();
+        }
+    };
+
+    window.onmouseup = () => dragging = null;
+    render();
+</script>
+</body>
+</html>
